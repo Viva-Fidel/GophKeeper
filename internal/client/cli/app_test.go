@@ -2,9 +2,7 @@ package cli
 
 import (
 	"context"
-	"database/sql"
 	"encoding/base64"
-	"errors"
 	"net/http/httptest"
 	"os"
 	"path/filepath"
@@ -28,7 +26,7 @@ func newSyncUserRepo() *syncUserRepo {
 
 func (m *syncUserRepo) CreateUser(_ context.Context, login, passwordHash string, salt []byte) (int64, error) {
 	if _, ok := m.users[login]; ok {
-		return 0, errors.New("user exists")
+		return 0, user.ErrUserExists
 	}
 	id := m.next
 	m.next++
@@ -39,7 +37,7 @@ func (m *syncUserRepo) CreateUser(_ context.Context, login, passwordHash string,
 func (m *syncUserRepo) GetUserByLogin(_ context.Context, login string) (*user.User, error) {
 	u, ok := m.users[login]
 	if !ok {
-		return nil, sql.ErrNoRows
+		return nil, user.ErrNotFound
 	}
 	return u, nil
 }

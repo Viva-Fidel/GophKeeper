@@ -28,7 +28,7 @@ type DbConfig struct {
 
 // AuthConfig описывает параметры JWT.
 type AuthConfig struct {
-	JWTSecret string `env:"JWT_SECRET" envDefault:"gophkeeper-dev-secret"`
+	JWTSecret string `env:"JWT_SECRET"`
 	TokenExp  string `env:"TOKEN_EXP" envDefault:"24h"`
 }
 
@@ -65,8 +65,8 @@ func parseFlags(conf *Config, fs *flag.FlagSet, args []string) (*Flags, error) {
 	if err := fs.Parse(args); err != nil {
 		return nil, err
 	}
-	if flags.DatabaseURI == "" {
-		return nil, errors.New("database URI is required")
+	if flags.JWTSecret == "" {
+		return nil, errors.New("JWT_SECRET is required")
 	}
 	return flags, nil
 }

@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"testing"
 	"time"
@@ -19,7 +18,7 @@ func newMockRepo() *mockRepo {
 
 func (m *mockRepo) CreateUser(_ context.Context, login, passwordHash string, salt []byte) (int64, error) {
 	if _, ok := m.users[login]; ok {
-		return 0, errors.New("user exists")
+		return 0, ErrUserExists
 	}
 	id := m.next
 	m.next++
@@ -30,7 +29,7 @@ func (m *mockRepo) CreateUser(_ context.Context, login, passwordHash string, sal
 func (m *mockRepo) GetUserByLogin(_ context.Context, login string) (*User, error) {
 	u, ok := m.users[login]
 	if !ok {
-		return nil, sql.ErrNoRows
+		return nil, ErrNotFound
 	}
 	return u, nil
 }

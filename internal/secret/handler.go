@@ -9,6 +9,9 @@ import (
 	"gophkeeper/pkg/middleware"
 )
 
+// MaxBodyBytes — максимальный размер тела запроса (upsert/sync), включая base64 ciphertext.
+const MaxBodyBytes = 10 << 20 // 10 MiB
+
 // Handler обрабатывает HTTP-запросы секретов.
 type Handler struct {
 	svc *Service
@@ -41,8 +44,8 @@ func (h *Handler) Upsert(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req UpsertRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+	if err := decodeJSONBody(w, r, &req); err != nil {
+		writeBodyError(w, err)
 		return
 	}
 	sec, err := h.svc.Upsert(r.Context(), userID, req)
@@ -113,8 +116,8 @@ func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	var req SyncRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusBadRequest)
+	if err := decodeJSONBody(w, r, &req); err != nil {
+		writeBodyError(w, err)
 		return
 	}
 	resp, err := h.svc.Sync(r.Context(), userID, req)
@@ -123,6 +126,22 @@ func (h *Handler) Sync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	writeJSON(w, http.StatusOK, resp)
+}
+
+// decodeJSONBody декодирует JSON с ограничением размера тела.
+func decodeJSONBody(w http.ResponseWriter, r *http.Request, dst any) error {
+	r.Body = http.MaxBytesReader(w, r.Body, MaxBodyBytes)
+	return json.NewDecoder(r.Body).Decode(dst)
+}
+
+// writeBodyError пишет статус по ошибке чтения/декодирования тела.
+func writeBodyError(w http.ResponseWriter, err error) {
+	var maxBytesErr *http.MaxBytesError
+	if errors.As(err, &maxBytesErr) {
+		w.WriteHeader(http.StatusRequestEntityTooLarge)
+		return
+	}
+	w.WriteHeader(http.StatusBadRequest)
 }
 
 // writeSecretError пишет HTTP-статус по типу доменной ошибки.

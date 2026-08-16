@@ -59,6 +59,26 @@ func TestHandlerBadBodyAndNotFound(t *testing.T) {
 	}
 }
 
+func TestHandlerUpsertBodyTooLarge(t *testing.T) {
+	userSvc := user.New(newUserMemRepo(), "secret", time.Hour)
+	authRes, err := userSvc.Register(context.Background(), "u3", "p", []byte("saltsaltsaltsalt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux := http.NewServeMux()
+	RegisterHTTP(mux, middleware.Auth(userSvc), NewHandler(HandlerDeps{Service: New(newMemRepo())}))
+
+	body := append([]byte(`{"type":"binary","title":"t","ciphertext":"`), bytes.Repeat([]byte("A"), MaxBodyBytes)...)
+	body = append(body, []byte(`"}`)...)
+	req := httptest.NewRequest(http.MethodPost, "/api/secrets", bytes.NewReader(body))
+	req.Header.Set("Authorization", "Bearer "+authRes.Token)
+	rr := httptest.NewRecorder()
+	mux.ServeHTTP(rr, req)
+	if rr.Code != http.StatusRequestEntityTooLarge {
+		t.Fatal(rr.Code)
+	}
+}
+
 func TestServiceUpsertBadCiphertext(t *testing.T) {
 	svc := New(newMemRepo())
 	if _, err := svc.Upsert(context.Background(), 1, UpsertRequest{Type: TypeText, Ciphertext: "%%%"}); err == nil {

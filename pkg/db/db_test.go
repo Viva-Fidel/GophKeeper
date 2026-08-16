@@ -2,11 +2,8 @@ package db
 
 import (
 	"context"
-	"os"
 	"path/filepath"
 	"testing"
-
-	"github.com/DATA-DOG/go-sqlmock"
 )
 
 func TestOpenEmptyURI(t *testing.T) {
@@ -15,65 +12,36 @@ func TestOpenEmptyURI(t *testing.T) {
 	}
 }
 
-func TestLoadUpMigrations(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "000001_init.up.sql"), []byte("SELECT 1;"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	_ = os.WriteFile(filepath.Join(dir, "readme.txt"), []byte("x"), 0o600)
-	ms, err := loadUpMigrations(dir)
-	if err != nil || len(ms) != 1 || ms[0].version != 1 {
-		t.Fatal(err, ms)
+func TestRunMigrationsEmptyURI(t *testing.T) {
+	if err := RunMigrations(context.Background(), "", "migrations"); err == nil {
+		t.Fatal("expected error")
 	}
 }
 
-func TestRunMigrations(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "000001_init.up.sql"), []byte("CREATE TABLE t(id INT);"), 0o600); err != nil {
-		t.Fatal(err)
-	}
-	db, mock, err := sqlmock.New()
-	if err != nil {
-		t.Fatal(err)
-	}
-	defer db.Close()
-
-	mock.ExpectExec(`CREATE TABLE IF NOT EXISTS schema_migrations`).
-		WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectQuery(`SELECT EXISTS`).
-		WithArgs(1).
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(false))
-	mock.ExpectBegin()
-	mock.ExpectExec(`CREATE TABLE t`).WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectExec(`INSERT INTO schema_migrations`).
-		WithArgs(1, "000001_init.up.sql").
-		WillReturnResult(sqlmock.NewResult(1, 1))
-	mock.ExpectCommit()
-
-	if err := RunMigrations(context.Background(), db, dir); err != nil {
-		t.Fatal(err)
-	}
-	if err := mock.ExpectationsWereMet(); err != nil {
-		t.Fatal(err)
+func TestRunMigrationsBadScheme(t *testing.T) {
+	if err := RunMigrations(context.Background(), "mysql://localhost/db", t.TempDir()); err == nil {
+		t.Fatal("expected error")
 	}
 }
 
-func TestRunMigrationsAlreadyApplied(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "000001_init.up.sql"), []byte("SELECT 1;"), 0o600); err != nil {
-		t.Fatal(err)
+func TestRunMigrationsMissingDir(t *testing.T) {
+	err := RunMigrations(
+		context.Background(),
+		"postgres://user:pass@127.0.0.1:1/db?sslmode=disable",
+		filepath.Join(t.TempDir(), "missing"),
+	)
+	if err == nil {
+		t.Fatal("expected error")
 	}
-	db, mock, err := sqlmock.New()
+}
+
+func TestToMigrateDatabaseURL(t *testing.T) {
+	got, err := toMigrateDatabaseURL("postgres://u:p@localhost:5432/db?sslmode=disable")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer db.Close()
-	mock.ExpectExec(`CREATE TABLE IF NOT EXISTS schema_migrations`).
-		WillReturnResult(sqlmock.NewResult(0, 0))
-	mock.ExpectQuery(`SELECT EXISTS`).
-		WithArgs(1).
-		WillReturnRows(sqlmock.NewRows([]string{"exists"}).AddRow(true))
-	if err := RunMigrations(context.Background(), db, dir); err != nil {
-		t.Fatal(err)
+	want := "pgx5://u:p@localhost:5432/db?sslmode=disable"
+	if got != want {
+		t.Fatalf("got %q want %q", got, want)
 	}
 }

@@ -3,6 +3,7 @@ package secret
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 )
 
@@ -35,7 +36,7 @@ func (repo *SecretRepository) Upsert(ctx context.Context, s Secret) (*Secret, er
 
 	out := &Secret{}
 	err := row.Scan(&out.ID, &out.UserID, &out.Type, &out.Title, &out.Ciphertext, &out.Version, &out.UpdatedAt, &out.Deleted)
-	if err == sql.ErrNoRows {
+	if errorsIsNoRows(err) {
 		return nil, ErrConflict
 	}
 	if err != nil {
@@ -115,7 +116,7 @@ func (repo *SecretRepository) SoftDelete(ctx context.Context, userID int64, id s
 
 // errorsIsNoRows проверяет, что ошибка — sql.ErrNoRows.
 func errorsIsNoRows(err error) bool {
-	return err == sql.ErrNoRows
+	return errors.Is(err, sql.ErrNoRows)
 }
 
 // scanSecrets читает все строки выборки в слайс Secret.

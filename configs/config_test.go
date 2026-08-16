@@ -21,8 +21,20 @@ func TestParseFlags(t *testing.T) {
 	}
 }
 
-func TestParseFlagsRequiresDB(t *testing.T) {
-	conf := &Config{}
+func TestParseFlagsAllowsEmptyDB(t *testing.T) {
+	conf := &Config{Auth: AuthConfig{JWTSecret: "s"}}
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	flags, err := parseFlags(conf, fs, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flags.DatabaseURI != "" {
+		t.Fatal(flags.DatabaseURI)
+	}
+}
+
+func TestParseFlagsRequiresJWTSecret(t *testing.T) {
+	conf := &Config{Db: DbConfig{DatabaseURI: "postgres://x"}}
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	if _, err := parseFlags(conf, fs, nil); err == nil {
 		t.Fatal("expected error")

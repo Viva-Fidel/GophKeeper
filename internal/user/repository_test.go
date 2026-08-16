@@ -2,9 +2,12 @@ package user
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"testing"
 
 	"github.com/DATA-DOG/go-sqlmock"
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 func TestUserRepository(t *testing.T) {
@@ -35,23 +38,36 @@ func TestUserRepository(t *testing.T) {
 	mock.ExpectQuery(`INSERT INTO users`).
 		WithArgs("alice", "hash", []byte("salt")).
 		WillReturnError(errDup)
-	if _, err := repo.CreateUser(context.Background(), "alice", "hash", []byte("salt")); err == nil {
-		t.Fatal("expected exists")
+	if _, err := repo.CreateUser(context.Background(), "alice", "hash", []byte("salt")); !errors.Is(err, ErrUserExists) {
+		t.Fatal(err)
 	}
+
+	mock.ExpectQuery(`SELECT id, login, password_hash, encryption_salt`).
+		WithArgs("missing").
+		WillReturnError(sql.ErrNoRows)
+	if _, err := repo.GetUserByLogin(context.Background(), "missing"); !errors.Is(err, ErrNotFound) {
+		t.Fatal(err)
+	}
+
 	if err := mock.ExpectationsWereMet(); err != nil {
 		t.Fatal(err)
 	}
 }
 
-type dupErr struct{}
-
-func (dupErr) Error() string { return "duplicate key value violates unique constraint" }
-
-var errDup = dupErr{}
+var errDup = &pgconn.PgError{Code: "23505"}
 
 func TestIsUniqueViolation(t *testing.T) {
 	if !isUniqueViolation(errDup) {
 		t.Fatal("expected unique")
+	}
+	if !isUniqueViolation(errors.Join(errors.New("wrap"), errDup)) {
+		t.Fatal("expected unique when wrapped")
+	}
+	if isUniqueViolation(&pgconn.PgError{Code: "23503"}) {
+		t.Fatal("foreign key is not unique")
+	}
+	if isUniqueViolation(errors.New("duplicate key")) {
+		t.Fatal("text match must not succeed")
 	}
 	if isUniqueViolation(nil) {
 		t.Fatal("nil")

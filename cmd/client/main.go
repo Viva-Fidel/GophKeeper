@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"syscall"
+
+	"golang.org/x/term"
 
 	"gophkeeper/internal/build"
 	"gophkeeper/internal/client/cli"
@@ -51,13 +54,16 @@ func main() {
 		fs := flag.NewFlagSet("register", flag.ExitOnError)
 		server := fs.String("s", "http://localhost:8080", "server URL")
 		login := fs.String("l", "", "login")
-		password := fs.String("p", "", "password")
 		_ = fs.Parse(os.Args[2:])
-		if *login == "" || *password == "" {
-			fatal(fmt.Errorf("login (-l) and password (-p) are required"))
+		if *login == "" {
+			fatal(fmt.Errorf("login (-l) is required"))
 		}
-		app.Password = *password
-		if err := app.Register(*server, *login, *password); err != nil {
+		password, err := readPassword("Password: ")
+		if err != nil {
+			fatal(err)
+		}
+		app.Password = password
+		if err := app.Register(*server, *login, password); err != nil {
 			fatal(err)
 		}
 		fmt.Println("registered")
@@ -65,13 +71,16 @@ func main() {
 		fs := flag.NewFlagSet("login", flag.ExitOnError)
 		server := fs.String("s", "http://localhost:8080", "server URL")
 		login := fs.String("l", "", "login")
-		password := fs.String("p", "", "password")
 		_ = fs.Parse(os.Args[2:])
-		if *login == "" || *password == "" {
-			fatal(fmt.Errorf("login (-l) and password (-p) are required"))
+		if *login == "" {
+			fatal(fmt.Errorf("login (-l) is required"))
 		}
-		app.Password = *password
-		if err := app.Login(*server, *login, *password); err != nil {
+		password, err := readPassword("Password: ")
+		if err != nil {
+			fatal(err)
+		}
+		app.Password = password
+		if err := app.Login(*server, *login, password); err != nil {
 			fatal(err)
 		}
 		fmt.Println("logged in")
@@ -81,7 +90,6 @@ func main() {
 		typ := fs.String("type", "", "login_password|text|binary|bank_card")
 		title := fs.String("title", "", "title")
 		login := fs.String("login", "", "login value")
-		password := fs.String("password", "", "password value")
 		text := fs.String("text", "", "text value")
 		file := fs.String("file", "", "binary file path")
 		cardNumber := fs.String("number", "", "card number")
@@ -94,7 +102,11 @@ func main() {
 		switch secret.Type(*typ) {
 		case secret.TypeLoginPassword:
 			payload.Login = *login
-			payload.Password = *password
+			password, err := readPassword("Password: ")
+			if err != nil {
+				fatal(err)
+			}
+			payload.Password = password
 		case secret.TypeText:
 			payload.Text = *text
 		case secret.TypeBinary:
@@ -141,7 +153,7 @@ func main() {
 		id := fs.String("id", "", "secret id")
 		title := fs.String("title", "", "new title")
 		login := fs.String("login", "", "login value")
-		password := fs.String("password", "", "password value")
+		setPassword := fs.Bool("set-password", false, "prompt for new password")
 		text := fs.String("text", "", "text value")
 		file := fs.String("file", "", "binary file path")
 		cardNumber := fs.String("number", "", "card number")
@@ -166,8 +178,12 @@ func main() {
 			if *login != "" {
 				payload.Login = *login
 			}
-			if *password != "" {
-				payload.Password = *password
+			if *setPassword {
+				password, err := readPassword("Password: ")
+				if err != nil {
+					fatal(err)
+				}
+				payload.Password = password
 			}
 		case secret.TypeText:
 			if *text != "" {
@@ -218,11 +234,31 @@ func main() {
 	}
 }
 
-// requirePassword завершает процесс, если не задан мастер-пароль шифрования.
-func requirePassword(app *cli.App) {
-	if app.Password == "" {
-		fatal(fmt.Errorf("set GOPHKEEPER_PASSWORD for encrypt/decrypt operations"))
+// readPassword читает пароль из stdin без эха.
+func readPassword(prompt string) (string, error) {
+	fmt.Fprint(os.Stderr, prompt)
+	b, err := term.ReadPassword(int(syscall.Stdin))
+	fmt.Fprintln(os.Stderr)
+	if err != nil {
+		return "", err
 	}
+	password := string(b)
+	if password == "" {
+		return "", fmt.Errorf("password is required")
+	}
+	return password, nil
+}
+
+// requirePassword запрашивает мастер-пароль, если он не задан через окружение.
+func requirePassword(app *cli.App) {
+	if app.Password != "" {
+		return
+	}
+	password, err := readPassword("Master password: ")
+	if err != nil {
+		fatal(err)
+	}
+	app.Password = password
 }
 
 // printPayload выводит расшифрованное содержимое секрета в stdout.
@@ -263,17 +299,19 @@ GophKeeper CLI
 
 Usage:
   gophkeeper version
-  gophkeeper register -s <url> -l <login> -p <password>
-  gophkeeper login    -s <url> -l <login> -p <password>
+  gophkeeper register -s <url> -l <login>
+  gophkeeper login    -s <url> -l <login>
   gophkeeper add -type <login_password|text|binary|bank_card> -title <title> [fields...]
   gophkeeper list
   gophkeeper get <id>
-  gophkeeper update -id <id> [fields...]
+  gophkeeper update -id <id> [fields...] [-set-password]
   gophkeeper delete <id>
   gophkeeper sync
 
+Passwords are prompted interactively (no echo) and are not accepted via flags.
+
 Environment:
-  GOPHKEEPER_PASSWORD  master password for local encryption
+  GOPHKEEPER_PASSWORD  master password for local encryption (optional; prompted if unset)
   GOPHKEEPER_DIR       local data directory (default ~/.gophkeeper)
 `))
 }

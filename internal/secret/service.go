@@ -3,6 +3,7 @@ package secret
 import (
 	"context"
 	"encoding/base64"
+	"errors"
 	"time"
 
 	"github.com/google/uuid"
@@ -110,7 +111,7 @@ func (s *Service) Sync(ctx context.Context, userID int64, req SyncRequest) (*Syn
 			Version:    version,
 			Deleted:    ch.Deleted,
 		})
-		if err != nil && err != ErrConflict {
+		if err != nil && !errors.Is(err, ErrConflict) {
 			return nil, err
 		}
 	}

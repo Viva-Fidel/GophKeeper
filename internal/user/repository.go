@@ -4,7 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
-	"strings"
+
+	"github.com/jackc/pgx/v5/pgconn"
 )
 
 // UserRepository хранит пользователей в PostgreSQL.
@@ -19,7 +20,8 @@ func NewUserRepository(database *sql.DB) *UserRepository {
 
 // isUniqueViolation определяет ошибку нарушения UNIQUE в PostgreSQL.
 func isUniqueViolation(err error) bool {
-	return err != nil && (strings.Contains(err.Error(), "duplicate key") || strings.Contains(err.Error(), "unique"))
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23505"
 }
 
 // CreateUser создаёт пользователя и возвращает его id.
@@ -31,7 +33,7 @@ func (repo *UserRepository) CreateUser(ctx context.Context, login, passwordHash 
 	).Scan(&id)
 	if err != nil {
 		if isUniqueViolation(err) {
-			return 0, errors.New("user exists")
+			return 0, ErrUserExists
 		}
 		return 0, err
 	}
@@ -45,6 +47,9 @@ func (repo *UserRepository) GetUserByLogin(ctx context.Context, login string) (*
 		`SELECT id, login, password_hash, encryption_salt FROM users WHERE login = $1`, login,
 	).Scan(&u.ID, &u.Login, &u.PasswordHash, &u.EncryptionSalt)
 	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
 		return nil, err
 	}
 	return u, nil

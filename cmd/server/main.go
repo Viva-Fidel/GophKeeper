@@ -41,6 +41,10 @@ func main() {
 // run подключается к БД, применяет миграции, поднимает HTTP API
 // и блокируется до отмены ctx либо ошибки Serve.
 func run(ctx context.Context, conf *config.Flags, migrationsDir string) error {
+	if err := db.RunMigrations(ctx, conf.DatabaseURI, migrationsDir); err != nil {
+		return fmt.Errorf("run migrations: %w", err)
+	}
+
 	database, err := db.Open(ctx, conf.DatabaseURI)
 	if err != nil {
 		return fmt.Errorf("db open: %w", err)
@@ -50,10 +54,6 @@ func run(ctx context.Context, conf *config.Flags, migrationsDir string) error {
 			slog.Error("db close", slog.Any("error", err))
 		}
 	}()
-
-	if err := db.RunMigrations(ctx, database, migrationsDir); err != nil {
-		return fmt.Errorf("run migrations: %w", err)
-	}
 
 	tokenTTL, err := time.ParseDuration(conf.TokenExp)
 	if err != nil {

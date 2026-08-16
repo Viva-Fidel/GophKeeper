@@ -2,7 +2,6 @@ package user
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"time"
 
@@ -52,12 +51,6 @@ func (s *Service) Register(ctx context.Context, login, password string, salt []b
 	}
 	id, err := s.repo.CreateUser(ctx, login, hash, salt)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrUserExists
-		}
-		if err.Error() == "user exists" {
-			return nil, ErrUserExists
-		}
 		return nil, err
 	}
 	token, err := auth.NewToken(id, s.jwtSecret, s.jwtTokenTTL)
@@ -71,7 +64,7 @@ func (s *Service) Register(ctx context.Context, login, password string, salt []b
 func (s *Service) Login(ctx context.Context, login, password string) (*AuthResult, error) {
 	u, err := s.repo.GetUserByLogin(ctx, login)
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
+		if errors.Is(err, ErrNotFound) {
 			return nil, ErrInvalidCredentials
 		}
 		return nil, err

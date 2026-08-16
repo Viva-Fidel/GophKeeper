@@ -3,10 +3,8 @@ package secret
 import (
 	"bytes"
 	"context"
-	"database/sql"
 	"encoding/base64"
 	"encoding/json"
-	"errors"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -27,7 +25,7 @@ func newUserMemRepo() *userMemRepo {
 
 func (m *userMemRepo) CreateUser(_ context.Context, login, passwordHash string, salt []byte) (int64, error) {
 	if _, ok := m.users[login]; ok {
-		return 0, errors.New("user exists")
+		return 0, user.ErrUserExists
 	}
 	id := m.next
 	m.next++
@@ -38,7 +36,7 @@ func (m *userMemRepo) CreateUser(_ context.Context, login, passwordHash string, 
 func (m *userMemRepo) GetUserByLogin(_ context.Context, login string) (*user.User, error) {
 	u, ok := m.users[login]
 	if !ok {
-		return nil, sql.ErrNoRows
+		return nil, user.ErrNotFound
 	}
 	return u, nil
 }
