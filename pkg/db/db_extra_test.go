@@ -1,6 +1,7 @@
 package db
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -14,7 +15,7 @@ func TestPingWithRetrySuccess(t *testing.T) {
 	}
 	defer db.Close()
 	mock.ExpectPing()
-	if err := pingWithRetry(db, 3, time.Millisecond); err != nil {
+	if err := pingWithRetry(context.Background(), db, 3, time.Millisecond); err != nil {
 		t.Fatal(err)
 	}
 }
@@ -27,7 +28,7 @@ func TestPingWithRetryFail(t *testing.T) {
 	defer db.Close()
 	mock.ExpectPing().WillReturnError(errPing)
 	mock.ExpectPing().WillReturnError(errPing)
-	if err := pingWithRetry(db, 2, time.Millisecond); err == nil {
+	if err := pingWithRetry(context.Background(), db, 2, time.Millisecond); err == nil {
 		t.Fatal("expected error")
 	}
 }

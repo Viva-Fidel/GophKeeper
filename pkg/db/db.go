@@ -25,7 +25,7 @@ func Open(ctx context.Context, uri string) (*sql.DB, error) {
 	sqlDB.SetMaxIdleConns(5)
 	sqlDB.SetConnMaxLifetime(time.Hour)
 
-	if err := pingWithRetry(sqlDB, 10, time.Second); err != nil {
+	if err := pingWithRetry(ctx, sqlDB, 10, time.Second); err != nil {
 		if closeErr := sqlDB.Close(); closeErr != nil {
 			slog.ErrorContext(ctx, "close db after ping failure", slog.Any("error", closeErr))
 		}
@@ -35,15 +35,19 @@ func Open(ctx context.Context, uri string) (*sql.DB, error) {
 }
 
 // pingWithRetry проверяет доступность БД с несколькими попытками.
-func pingWithRetry(db *sql.DB, attempts int, delay time.Duration) error {
+func pingWithRetry(ctx context.Context, db *sql.DB, attempts int, delay time.Duration) error {
 	var lastErr error
 	for i := 0; i < attempts; i++ {
-		if err := db.Ping(); err == nil {
+		if err := db.PingContext(ctx); err == nil {
 			return nil
 		} else {
 			lastErr = err
 		}
-		time.Sleep(delay)
+		select {
+		case <-time.After(delay):
+		case <-ctx.Done():
+			return fmt.Errorf("database ping cancelled: %w", ctx.Err())
+		}
 	}
 	return fmt.Errorf("database ping failed after %d attempts: %w", attempts, lastErr)
 }
