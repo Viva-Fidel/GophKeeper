@@ -1,0 +1,56 @@
+package config
+
+import (
+	"flag"
+	"testing"
+)
+
+func TestParseFlags(t *testing.T) {
+	conf := &Config{
+		Server: ServerConfig{Address: ":8080"},
+		Db:     DbConfig{DatabaseURI: "postgres://x"},
+		Auth:   AuthConfig{JWTSecret: "s", TokenExp: "1h"},
+	}
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	flags, err := parseFlags(conf, fs, []string{"-a", ":9090"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flags.RunAddress != ":9090" {
+		t.Fatal(flags.RunAddress)
+	}
+}
+
+func TestParseFlagsAllowsEmptyDB(t *testing.T) {
+	conf := &Config{}
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	flags, err := parseFlags(conf, fs, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flags.DatabaseURI != "" {
+		t.Fatal(flags.DatabaseURI)
+	}
+}
+
+func TestParseFlagsAllowsEmptyJWTSecret(t *testing.T) {
+	conf := &Config{Db: DbConfig{DatabaseURI: "postgres://x"}}
+	fs := flag.NewFlagSet("test", flag.ContinueOnError)
+	flags, err := parseFlags(conf, fs, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flags.JWTSecret != "" {
+		t.Fatal(flags.JWTSecret)
+	}
+}
+
+func TestLoadConfig(t *testing.T) {
+	cfg, err := loadConfig()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if cfg.Server.Address == "" {
+		t.Fatal("empty address")
+	}
+}

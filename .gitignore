@@ -1,0 +1,15 @@
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+vendor/
+.idea
+.vscode
+cmd/server/server
+cmd/client/client
+bin/
+.env
+*.db
