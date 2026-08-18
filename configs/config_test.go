@@ -22,7 +22,7 @@ func TestParseFlags(t *testing.T) {
 }
 
 func TestParseFlagsAllowsEmptyDB(t *testing.T) {
-	conf := &Config{Auth: AuthConfig{JWTSecret: "s"}}
+	conf := &Config{}
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
 	flags, err := parseFlags(conf, fs, nil)
 	if err != nil {
@@ -33,11 +33,15 @@ func TestParseFlagsAllowsEmptyDB(t *testing.T) {
 	}
 }
 
-func TestParseFlagsRequiresJWTSecret(t *testing.T) {
+func TestParseFlagsAllowsEmptyJWTSecret(t *testing.T) {
 	conf := &Config{Db: DbConfig{DatabaseURI: "postgres://x"}}
 	fs := flag.NewFlagSet("test", flag.ContinueOnError)
-	if _, err := parseFlags(conf, fs, nil); err == nil {
-		t.Fatal("expected error")
+	flags, err := parseFlags(conf, fs, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if flags.JWTSecret != "" {
+		t.Fatal(flags.JWTSecret)
 	}
 }
 

@@ -2,7 +2,6 @@
 package config
 
 import (
-	"errors"
 	"flag"
 	"os"
 
@@ -64,9 +63,6 @@ func parseFlags(conf *Config, fs *flag.FlagSet, args []string) (*Flags, error) {
 	fs.StringVar(&flags.TokenExp, "t", flags.TokenExp, "jwt token ttl")
 	if err := fs.Parse(args); err != nil {
 		return nil, err
-	}
-	if flags.JWTSecret == "" {
-		return nil, errors.New("JWT_SECRET is required")
 	}
 	return flags, nil
 }

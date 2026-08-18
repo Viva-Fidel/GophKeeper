@@ -22,6 +22,18 @@ func TestRunEmptyDatabaseURI(t *testing.T) {
 	}
 }
 
+func TestRunEmptyJWTSecret(t *testing.T) {
+	err := run(context.Background(), &config.Flags{
+		RunAddress:  "127.0.0.1:0",
+		DatabaseURI: "postgres://x",
+		JWTSecret:   "",
+		TokenExp:    "1h",
+	}, "migrations")
+	if err == nil || err.Error() != "JWT_SECRET is required" {
+		t.Fatalf("expected JWT_SECRET error, got %v", err)
+	}
+}
+
 func TestMainExitsWithoutFlags(t *testing.T) {
 	if os.Getenv("BE_SERVER") == "1" {
 		oldArgs := os.Args

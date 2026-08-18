@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -41,6 +42,10 @@ func main() {
 // run подключается к БД, применяет миграции, поднимает HTTP API
 // и блокируется до отмены ctx либо ошибки Serve.
 func run(ctx context.Context, conf *config.Flags, migrationsDir string) error {
+	if conf.JWTSecret == "" {
+		return errors.New("JWT_SECRET is required")
+	}
+
 	if err := db.RunMigrations(ctx, conf.DatabaseURI, migrationsDir); err != nil {
 		return fmt.Errorf("run migrations: %w", err)
 	}
